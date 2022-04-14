@@ -13,10 +13,7 @@ jupyterlab = "*"
 altair = "*"
 jupytext = "*"
 jupyterlab-templates = "*"
-certifi = "*"
 ipywidgets = "*"
-itables = "*"
-tqdm = "*"
 streamlit = "*"
 
 [dev-packages]
