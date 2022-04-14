@@ -5,6 +5,7 @@ from glob import glob
 from datetime import date
 import numpy as np
 import pandas as pd
+from datetime import date
 import re
 import time
 from zipfile import ZipFile
@@ -26,14 +27,14 @@ contribs_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'c
             'contributorStreetPostalCode', 'contributorStreetStateCd', 'contributorStreetCountryCd']
 expend_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'expendDt', 'expendAmount', 
             'expendDescr', 'expendCatCd', 'politicalExpendCd',
-            'payeePersentTypeCd', 'payeeNameOrganization', 'payeeNameLast', 'payeeNameFirst']
-            # 'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
+            'payeePersentTypeCd', 'payeeNameOrganization', 'payeeNameLast', 'payeeNameFirst',
+            'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
 travel_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'parentDt', 'parentType', 'parentId', 
             'transportationTypeCd', 'transportationTypeDescr', 'departureCity', 'arrivalCity', 'departureDt', 'arrivalDt',
             'travelPurpose']
 loans_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 'loanDt', 'loanAmount',
-            'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst', 'lenderEmployer']
-            # 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
+            'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst', 'lenderEmployer',
+            'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
 debts_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 
             'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst']
             # 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
@@ -63,14 +64,6 @@ def clean_filer_data(file):
         'filerHoldOfficeDistrict', 'contestSeekOfficeCd', 'contestSeekOfficeDistrict', 'filerEffStartDt', 'filerEffStopDt']]\
         .sort_values('filerEffStartDt')\
         .fillna('')
-
-    # office_cols = [col for col in filers.columns if 'Office' in col]
-    # filers['filerStatus'] = np.where((filers.filerHoldOfficeCd != '') | (filers.contestSeekOfficeCd != ''), 
-    #                                 filers.filerFilerpersStatusCd + '/ ' + filers[office_cols].apply(lambda row: ' '.join(row.values.astype(str)).strip(), axis=1),
-    #                                 filers.filerFilerpersStatusCd
-    #                                 )
-    # filers.drop(columns=office_cols, inplace=True)
-    # filers.drop(columns=['filerFilerpersStatusCd'], inplace=True)
 
     return filers
 
@@ -231,11 +224,9 @@ def main():
 
     # Downloading and extracting file
     print('Updating data')
-    # zipfile = requests.get('https://www.ethics.state.tx.us/data/search/cf/TEC_CF_CSV.zip').content
-    # with open(f'{os.getcwd()}/data/source/TEC_CF.zip', 'wb') as f:
-    #     f.write(zipfile)
-    # zf = ZipFile(zipfile)
-    zf = ZipFile(f'{os.getcwd()}/data/source/TEC_CF.zip')
+    zipfile = requests.get('https://www.ethics.state.tx.us/data/search/cf/TEC_CF_CSV.zip').content
+    zf = ZipFile(zipfile)
+    # zf = ZipFile(f'{os.getcwd()}/data/source/TEC_CF.zip')
                 
     # Loading filer data
     filers = make_sorted_cols(clean_filer_data(zf.open('filers.csv')))
@@ -243,9 +234,9 @@ def main():
 
     # Combine, clean and export contributions and expenditures
     contribs = clean_and_export('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
-    # expend = clean_and_export('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
+    expend = clean_and_export('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
     # clean_and_export('travel', zf, filers, ['travel.csv'], travel_cols, ['receivedDt', 'parentDt', 'departureDt', 'arrivalDt']) # Travel
-    # loans = clean_and_export('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
+    loans = clean_and_export('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
     # clean_and_export('debts', zf, filers, ['debts.csv'], debts_cols, ['receivedDt']) # Debts
 
     # Making monthly tables
@@ -255,6 +246,9 @@ def main():
     # make_monthly_table('expend', expend, 'payee', 'expend')
     # make_monthly_table('loans', loans, 'filer', 'loan')
     # make_monthly_table('loans', loans, 'lender', 'loan')
+
+    with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
+        f.write(date.today().strftime(format='%b %d, %Y'))
 
     executionTime = (time.time() - startTime)
     print('Execution time in seconds: ' + str(executionTime))

@@ -58,7 +58,7 @@ text-align: center;
 st.title('Campaign Finance Data Tool')
 st.markdown("""
 This application processes and visualizes the **last five years** of campaign finance data released by the Texas Ethics Commission. 
-The raw data is available for download [here](https://www.ethics.state.tx.us/data/search/cf/CFS-ReadMe.txt). Based on your selection of filers, 
+The raw data is available for download [here](https://www.ethics.state.tx.us/data/search/cf/CFS-ReadMe.txt). According to your selection of filers, 
 the application will display contribution, expenditure and loan data for each filer
 and then compare the filers you selected and their contributors, payees and lenders.
 
@@ -87,7 +87,7 @@ def load_filers():
     return filers
 
 
-def display_data(filername):
+def display_data(filername, prefix):
 
     filers = load_filers()
     
@@ -97,10 +97,11 @@ def display_data(filername):
         filer_initials = filername[:3]
         contribs = pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/contribs_{filer_initials}.csv', low_memory=False, parse_dates=['contribution_dt', 'received_dt'])
         contribs.columns = contribs.columns.str.replace('_', ' ').str.title()
-        contribs[['Contributor Street City', 'Contributor Street State', 'Contributor Street Postal Code', 'Contributor Street Country']] = \
-            contribs[['Contributor Street City', 'Contributor Street State', 'Contributor Street Postal Code', 'Contributor Street Country']].fillna('').astype(str)
-        contribs['Contributor Location'] = contribs['Contributor Street City'] + ', ' + contribs['Contributor Street State'] + ' ' + \
-            contribs['Contributor Street Postal Code'] + ', ' + contribs['Contributor Street Country']
+        if 
+        contribs[[f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']] = \
+            contribs[['{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']].fillna('').astype(str)
+        contribs[f'{prefix} Location'] = contribs[f'{prefix} Street City'] + ', ' + contribs[f'{prefix} Street State'] + ' ' + \
+            contribs['{prefix} Street Postal Code'] + ', ' + contribs[f'{prefix} Street Country']
         filtered_contribs = contribs[contribs['Filer Name'].str.lower() == filername.lower()]
         filtered_contribs['year'] = filtered_contribs['Contribution Dt'].dt.year
         returndf = filtered_contribs.copy()
@@ -121,20 +122,20 @@ def display_data(filername):
             avg_count_diff = round(avg_count_this_year - avg_count_last_year)
 
             top_contrib_this_year = filtered_contribs[filtered_contribs.year == this_year].sort_values('Contribution Amount', ascending=False).iloc[0]
-            top_contrib_this_year_name = top_contrib_this_year['Contributor Name']
-            top_contrib_this_year_info = 'Located at ' + str(top_contrib_this_year['Contributor Street Postal Code']) + ' in ' + str(top_contrib_this_year['Contributor Street City']) + ', ' + str(top_contrib_this_year['Contributor Street State'].upper())
-            if top_contrib_this_year['Contributor Employer'] != '':
-                top_contrib_this_year_info = 'Employed by ' + str(top_contrib_this_year['Contributor Employer']) + ' in ' + str(top_contrib_this_year['Contributor Street City']) + ', ' + str(top_contrib_this_year['Contributor Street State'].upper())
+            top_contrib_this_year_name = top_contrib_this_year['{prefix} Name']
+            top_contrib_this_year_info = 'Located at ' + str(top_contrib_this_year['{prefix} Street Postal Code']) + ' in ' + str(top_contrib_this_year['{prefix} Street City']) + ', ' + str(top_contrib_this_year['{prefix} Street State'].upper())
+            if top_contrib_this_year['{prefix} Employer'] != '':
+                top_contrib_this_year_info = 'Employed by ' + str(top_contrib_this_year['{prefix} Employer']) + ' in ' + str(top_contrib_this_year['{prefix} Street City']) + ', ' + str(top_contrib_this_year['{prefix} Street State'].upper())
 
             col1, col2, col3 = st.columns(3)
             col1.metric(label=f"Avg Monthly Contribution Amount ({this_year})", value='${:,}'.format(avg_amount_this_year), delta='${:,}'.format(avg_amount_diff))
             col2.metric(label=f"Avg Monthly Contribution Count ({this_year})", value='{:,}'.format(avg_count_this_year), delta='{:,}'.format(avg_count_diff))
-            col3.metric(label=f'Top Contributor ({this_year})', value=top_contrib_this_year_name, delta=top_contrib_this_year_info, delta_color='off')
+            col3.metric(label=f'Top {prefix} ({this_year})', value=top_contrib_this_year_name, delta=top_contrib_this_year_info, delta_color='off')
             
 
         filtered_contribs = filtered_contribs[[col for col in filtered_contribs.columns if col not in list(filers.columns)]]\
             .sort_values('Contribution Dt', ascending=False).reset_index(drop=True)
-        filtered_contribs.drop(columns=['year', 'Contributor Street City', 'Contributor Street State', 'Contributor Street Postal Code', 'Contributor Street Country'], inplace=True)
+        filtered_contribs.drop(columns=['year', '{prefix} Street City', '{prefix} Street State', '{prefix} Street Postal Code', '{prefix} Street Country'], inplace=True)
 
         # Display filer table
         filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True)
@@ -187,7 +188,7 @@ def get_common(concat_dfs, year):
 
     common = grouped[grouped.filers_count > 1]\
     .rename(columns={'contrib_amount': 'Contributions Total'})\
-    [['Contributor Name', 'Contributor Persent Type', 'Contributor Location', 'Contributions Total', 'Filers']].reset_index(drop=True)
+    [['{prefix} Name', '{prefix} Persent Type', '{prefix} Location', 'Contributions Total', 'Filers']].reset_index(drop=True)
 
     for col in common.columns:
         if list(common[col].unique()) == ['']:
@@ -206,7 +207,7 @@ def compare_filers(dfs):
         with st.expander('Contribution Monthly Totals ($) Chart'):
             st.altair_chart(make_chart(concat_dfs), use_container_width=True)
 
-        with st.expander('Common Contributors'):
+        with st.expander('Common {prefix}s'):
             years =['All']
             years.extend(sorted(concat_dfs.year.unique()))
             year = st.selectbox('Select a year to view common contributors', years)
