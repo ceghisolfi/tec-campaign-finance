@@ -6,6 +6,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 from datetime import date
+from io import BytesIO
 import re
 import time
 from zipfile import ZipFile
@@ -28,13 +29,13 @@ contribs_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'c
 expend_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'expendDt', 'expendAmount', 
             'expendDescr', 'expendCatCd', 'politicalExpendCd',
             'payeePersentTypeCd', 'payeeNameOrganization', 'payeeNameLast', 'payeeNameFirst',
-            'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
+            'payeeStreetCity', 'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
 travel_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'parentDt', 'parentType', 'parentId', 
             'transportationTypeCd', 'transportationTypeDescr', 'departureCity', 'arrivalCity', 'departureDt', 'arrivalDt',
             'travelPurpose']
 loans_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 'loanDt', 'loanAmount',
             'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst', 'lenderEmployer',
-            'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
+            'lenderStreetCity', 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
 debts_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 
             'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst']
             # 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
@@ -224,7 +225,7 @@ def main():
 
     # Downloading and extracting file
     print('Updating data')
-    zipfile = requests.get('https://www.ethics.state.tx.us/data/search/cf/TEC_CF_CSV.zip').content
+    zipfile = BytesIO(requests.get('https://www.ethics.state.tx.us/data/search/cf/TEC_CF_CSV.zip').content)
     zf = ZipFile(zipfile)
     # zf = ZipFile(f'{os.getcwd()}/data/source/TEC_CF.zip')
                 
@@ -233,7 +234,7 @@ def main():
     filers.to_csv(f'{os.getcwd()}/data/processed/filers.csv', index=False)
 
     # Combine, clean and export contributions and expenditures
-    contribs = clean_and_export('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
+    # contribs = clean_and_export('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
     expend = clean_and_export('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
     # clean_and_export('travel', zf, filers, ['travel.csv'], travel_cols, ['receivedDt', 'parentDt', 'departureDt', 'arrivalDt']) # Travel
     loans = clean_and_export('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans

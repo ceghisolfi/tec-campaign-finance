@@ -105,13 +105,20 @@ def filter_data(filername, var, prefix, var_short):
             data[f'{prefix} Street Postal Code'] + ', ' + data[f'{prefix} Street Country']
         filtered_data = data[data['Filer Name'].str.lower() == filername.lower()]
         filtered_data['year'] = filtered_data[f'{var} Dt'].dt.year
+        filtered_data = filtered_data[[col for col in filtered_data.columns if col not in list(filers.columns)]]\
+                    .sort_values(f'{var} Dt', ascending=False).reset_index(drop=True)
+        filtered_data.drop(columns=['year', f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country'], inplace=True)
         return filtered_data
     except:
         return []
 
 
 
-def get_stats(monthly, filtered_data, this_year, var, prefix):
+def get_stats(filtered_data, var, prefix):
+
+    this_year = filtered_data.year.max()
+    monthly = filtered_data.groupby([pd.Grouper(key=f'{var} Dt', freq='M'), 'year'])\
+                    .agg(amount = (f'{var} Amount', 'sum'), count = (f'{var} Amount', 'count')).reset_index().fillna(0)
 
     avg_amount_this_year = round(monthly[monthly.year == this_year]['amount'].mean())
     avg_amount_last_year = round(monthly[monthly.year == this_year - 1]['amount'].mean())
@@ -131,6 +138,20 @@ def get_stats(monthly, filtered_data, this_year, var, prefix):
         pass
 
     return avg_amount_this_year, avg_amount_diff, avg_count_this_year, avg_count_diff, top_contrib_this_year_name, top_contrib_this_year_info
+
+
+
+def display_filertable(filertable):
+    with st.expander('Filer Information'):
+            st.dataframe(filertable.fillna(''))
+
+
+
+def display_stats(avg_amount_this_year, avg_amount_diff, avg_count_this_year, avg_count_diff, top_contrib_this_year_name, top_contrib_this_year_info):
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label=f"Avg Monthly {var} Amount ({this_year})", value='${:,}'.format(avg_amount_this_year), delta='${:,}'.format(avg_amount_diff))
+    col2.metric(label=f"Avg Monthly {var} Count ({this_year})", value='{:,}'.format(avg_count_this_year), delta='{:,}'.format(avg_count_diff))
+    col3.metric(label=f'Top {prefix} ({this_year})', value=top_contrib_this_year_name, delta=top_contrib_this_year_info, delta_color='off')
 
 
 
@@ -220,9 +241,9 @@ def process_data(filername, var, prefix, var_short): # Contribution, Contributor
                     col3.metric(label=f'Top {prefix} ({this_year})', value=top_contrib_this_year_name, delta=top_contrib_this_year_info, delta_color='off')
                     
 
-                filtered_data = filtered_data[[col for col in filtered_data.columns if col not in list(filers.columns)]]\
-                    .sort_values(f'{var} Dt', ascending=False).reset_index(drop=True)
-                filtered_data.drop(columns=['year', f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country'], inplace=True)
+                # filtered_data = filtered_data[[col for col in filtered_data.columns if col not in list(filers.columns)]]\
+                #     .sort_values(f'{var} Dt', ascending=False).reset_index(drop=True)
+                # filtered_data.drop(columns=['year', f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country'], inplace=True)
 
                 # Display data table
                 # returndf = display_data(filtered_data, var, returndf, filername)
@@ -295,16 +316,48 @@ with st.container():
 
     filers = load_filers()
 
+    # Display filters
     filertypeW = st.radio('Filer Type', ('INDIVIDUAL', 'ENTITY'))
     filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), label='Filer Name')
+
+    for filername in filernameW:   
+
+        # Display title
+        st.markdown(f'### {filername}')
+        
+        filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
+        filtered_dfs = [filter_data(filername, vardicts[i]['var'], vardicts[i]['prefix'], vardicts[i]['var_short']) for i in range(len(vardicts))]
+        stats = [get_stats(filtered_dfs[i], vardicts[i]['var'], vardicts[i]['prefix']) for i in range(len(vardicts))]
+
+        for i in range(len(vardicts)):
+            display_filertable(filertable)
+            display_stats(stats[i])
+            
+        # stats = [get_stats(filtered_data, var, prefix)
+
+
+        # for d in vardicts:
+        #     filtered_data = filter_data(filername, d['var'], d['prefix'], d['var_short'])
+            
+
+        # Display stats
+
+
+        # Display filer table
+
+
+        # Display charts
+
+
+
 
 
     dfs = []
     for filername in filernameW:   
         # Display filer table
         st.markdown(f'### {filername}')
-        filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True)
-        filertable.dropna(how='all', axis=1, inplace=True)
+        filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
+        # filertable.dropna(how='all', axis=1, inplace=True)
         with st.expander('Filer Information'):
             st.dataframe(filertable.fillna(''))
         for d in vardicts:
