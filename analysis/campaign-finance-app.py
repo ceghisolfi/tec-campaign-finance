@@ -87,7 +87,7 @@ def load_filers():
 
     return filers
 
-
+@st.cache(allow_output_mutation=True)
 def filter_data(filername, dtype):
 
     # Load dtype vars
@@ -100,7 +100,7 @@ def filter_data(filername, dtype):
     else:
         vardt = var
     try:
-        data = pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/{var_short}_{filer_initials}.csv', low_memory=False, parse_dates=[f'{vardt.lower()}_dt', 'received_dt'])
+        data = pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/{var_short}/{var_short}_{filer_initials}.csv', low_memory=False, parse_dates=[f'{vardt.lower()}_dt', 'received_dt'])
         data.columns = data.columns.str.replace('_', ' ').str.title().str.replace('Expend', 'Expenditure')
         data[[f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']] = \
             data[[f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']].fillna('').astype(str)
@@ -221,6 +221,7 @@ def display_common(common, dtype, names):
         st.write('No data to display')
 
 
+@st.cache
 def make_chart(concat_dfs, var):
 
     concat_dfs[f'{var} Dt'] = pd.to_datetime(concat_dfs[f'{var} Dt'])
@@ -233,6 +234,7 @@ def make_chart(concat_dfs, var):
                                       tooltip=alt.Tooltip(f'{var} Amount',format=",.2f")
                                      ).properties(width=1000)
     return chart
+
 
 
 def display_chart(concat_dfs, dtype):
@@ -251,8 +253,9 @@ def get_filer_data():
     filers = load_filers()
 
     # Display filters
-    filertypeW = st.radio('Filer Type', ('INDIVIDUAL', 'ENTITY'))
-    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), label='Filer Name')
+    st.caption('This is a string that explains something above.')
+    filertypeW = st.radio('Select a filer type', ('INDIVIDUAL', 'ENTITY'))
+    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), label='Select one or more filers by name')
 
     data = []
 
@@ -343,6 +346,7 @@ def main():
 
     filernameW, els = get_filer_data()
     compare_filers(filernameW, els)
+    st.markdown(footer,unsafe_allow_html=True)
 
 
 main()
