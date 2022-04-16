@@ -87,7 +87,7 @@ def load_filers():
 
     return filers
 
-@st.cache(allow_output_mutation=True)
+
 def filter_data(filername, dtype):
 
     # Load dtype vars
