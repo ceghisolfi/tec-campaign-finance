@@ -252,8 +252,6 @@ def get_common(concat_dfs, dtype):
 
 def display_common(concat_dfs, dtype, names):
 
-    concat_dfs.to_csv(f'{os.getcwd()}/data/source/test_shared.csv')
-
     var, prefix = dtype[0], dtype[1]
 
     st.markdown(f'**Shared {prefix}s**')
