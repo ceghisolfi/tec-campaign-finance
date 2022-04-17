@@ -91,7 +91,6 @@ def load_filers():
 
 
 def filter_balance(ids):
-    print(ids)
     balance = pd.concat([pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/balance/balance_{id}.csv', dtype={'filer_ident': str}, parse_dates=['received_dt']) for id in ids])
     balance.columns = [col.replace('_', ' ').title() for col in balance.columns]
 
