@@ -8,7 +8,7 @@ on:
     - cron: "0 0 * * *" # Runs at 03:00 AM (UTC) every Monday, Wednesday, and Friday (Check https://crontab.guru/)
 
 jobs:
-  zotero-to-readwise-automation:
+  data-update-automation:
     runs-on: macos-latest
     steps:
       - name: 🍽️ Checkout the repo
