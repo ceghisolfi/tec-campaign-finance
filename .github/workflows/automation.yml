@@ -21,14 +21,11 @@ jobs:
         with:
           python-version: '3.8'
 
-      - name: Install pipenv
-            run: |
-              pip install pipenv
-
-      - name: Install dependencies
-        if: steps.cache-pipenv.outputs.cache-hit != 'true'
-        run: |
-          pipenv install --deploy --dev
+     - name: 💿 Install pipenv and dependencies
+        run: pip install pipenv
+        copy: Pipfile .
+        copy: Pipfile.lock .
+        run: pipenv install — system — deploy
 
       - name: 📥 Download the Python script needed for automation
         run:  curl https://github.com/ceghisolfi/tec-campaign-finance/blob/master/etl/update_data.py -o update_data.py
