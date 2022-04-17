@@ -15,6 +15,7 @@ jupytext = "*"
 jupyterlab-templates = "*"
 ipywidgets = "*"
 streamlit = "*"
+vega-datasets = "*"
 
 [dev-packages]
 

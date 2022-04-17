@@ -17,7 +17,6 @@ st.set_page_config(
         layout='wide',
         initial_sidebar_state="expanded"
     )
-st.image('https://upload.wikimedia.org/wikipedia/commons/d/d9/Austin_American-Statesman_%282019-10-31%29.svg', width=300)
 m = st.markdown("""
 <style>
 div.stButton > button:first-child {
@@ -55,73 +54,114 @@ text-align: center;
 """
 
 
-st.title('Campaign Finance Data Tool')
 
-with request.urlopen('https://data-statesman.s3.amazonaws.com/tec-campaign-finance/documentation/last_update.txt') as f:
-    last_update = f.read().decode('utf-8')
-
-st.markdown(f'##### Last update: {last_update}')
-st.markdown("""
-This application processes and visualizes the **last five years** of campaign finance data released by the Texas Ethics Commission. 
-The raw data is available for download [here](https://www.ethics.state.tx.us/data/search/cf/CFS-ReadMe.txt). According to your selection of filers, 
-the application will display contribution, expenditure and loan data for each filer
-and then compare the filers you selected and their contributors, payees and lenders.
-
-To begin, select one or more filers by **TYPE** and **NAME**. 
-
-""")
+# Defining dtypes
+contribs=['Contribution', 'Contributor', 'contribs']
+expend = ['Expenditure', 'Payee', 'expend']
+loans = ['Loan', 'Lender', 'loans']
+dtypes = [contribs, expend, loans]
 
 
-@st.cache
+
 def convert_df(df):
      # IMPORTANT: Cache the conversion to prevent computation on every rerun
      return df.to_csv().encode('utf-8')
 
 
+
+def display_download_button(data, label, file_name):
+    data_csv = convert_df(data)
+    st.download_button(
+        label=label,
+        data=data_csv,
+        file_name=file_name,
+        mime='text/csv'
+    )
+
+
+
 @st.cache
 def load_filers():
-    filers = pd.read_csv('https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/filers.csv', dtype={'filer_ident': str})
+    filers = pd.read_csv('https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/filers.csv', dtype={'filerIdent': str})
     filers.columns = [re.sub( '(?<!^)(?=[A-Z])', ' ', col.replace('Cd', '')).title() for col in filers.columns]
-    filers = filers[(filers['Filer Name'].str.lower().str.contains('use, do not|not to be use|do not') == False)]
     filers['Filer Filerpers Status'] = filers['Filer Filerpers Status'].str.replace('_', ' ')
 
     return filers
 
 
-def filter_data(filername, dtype):
+
+def filter_balance(ids):
+    print(ids)
+    balance = pd.concat([pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/balance/balance_{id}.csv', dtype={'filer_ident': str}, parse_dates=['received_dt']) for id in ids])
+    balance.columns = [col.replace('_', ' ').title() for col in balance.columns]
+
+    return balance
+
+
+
+def filter_data(ids, filername, dtype):
 
     # Load dtype vars
     var, prefix, var_short = dtype[0], dtype[1], dtype[2]
 
     # Filter data
-    filer_initials = filername[:3]
     if var == 'Expenditure':
         vardt = 'expend'
     else:
         vardt = var
     try:
-        data = pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/{var_short}/{var_short}_{filer_initials}.csv', low_memory=False, parse_dates=[f'{vardt.lower()}_dt', 'received_dt'])
+        data = pd.concat([
+            pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/{var_short}/{var_short}_{id}.csv', 
+            low_memory=False, parse_dates=[f'{vardt.lower()}_dt', 'received_dt']) for id in ids
+        ])
         data.columns = data.columns.str.replace('_', ' ').str.title().str.replace('Expend', 'Expenditure')
-        data[[f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']] = \
-            data[[f'{prefix} Street City', f'{prefix} Street State', f'{prefix} Street Postal Code', f'{prefix} Street Country']].fillna('').astype(str)
-        data[f'{prefix} Location'] = data[f'{prefix} Street City'] + ', ' + data[f'{prefix} Street State'] + ' ' + \
-            data[f'{prefix} Street Postal Code'] + ', ' + data[f'{prefix} Street Country']
         filtered_data = data[data['Filer Name'].str.lower() == filername.lower()]
         filtered_data['year'] = filtered_data[f'{var} Dt'].dt.year
+        filtered_data = filtered_data[[
+            col for col in filtered_data.columns if ('Filer' not in col or col in ['Filer Ident', 'Filer Name']) and 'Office' not in col
+            ]]
         return filtered_data
     except:
         return []
 
 
+
 def display_filertable(filertable):
+    if filertable['Filer Ident'].nunique() > 1:
+        name = filertable['Filer Name'].iloc[0]
+        st.warning(f'More than one filer ID found for {name}. Please consult the filer information box below and verify that all filer records listed match your search.')
     with st.expander('Filer Information'):
             st.dataframe(filertable.fillna(''))
+
+
+
+def display_balance_stats(filtered_balance):
+    if len(filtered_balance) > 0:
+        # Display balance stats
+        last_balance_amount = round(filtered_balance.iloc[0]['Balance'])
+        prev_balance_amount = round(filtered_balance.iloc[1]['Balance'])
+        balance_diff = round(last_balance_amount - prev_balance_amount)
+        last_balance_date = filtered_balance.iloc[0]['Received Dt'].strftime('%b %d, %Y')
+        
+        # Display balance stats
+        st.metric(label=f"Latest Balance (filed on {last_balance_date})", value='${:,}'.format(last_balance_amount), delta='{:,}'.format(balance_diff))
+
+
+
+def display_balance_data(filername, filtered_balance):
+    if len(filtered_balance) > 0:
+        with st.expander(f'Balance'):
+            st.info('Balance is calculated as: (Total Contributions + Total Unitemized Contributions + Total Contributions Mantained + Total Interest & Income Earned) \
+            - (Total Expenditures + Total Unitemized Expenditures + Total Outstanding Loans + Total Unitemized Loans)')
+            display_download_button(filtered_balance, f"Download balance data", f"balance_{filername}.csv")
+            st.dataframe(filtered_balance)
+
 
 
 def display_stats(dtype):
 
     # Load dtype vars
-    var, prefix, varshort, filtered_data = dtype[0], dtype[1], dtype[2], dtype[3]
+    var, prefix, filtered_data = dtype[0], dtype[1], dtype[3]
 
     if len(filtered_data) > 0:
 
@@ -142,18 +182,21 @@ def display_stats(dtype):
 
             top_contrib_this_year = filtered_data[filtered_data.year == this_year].sort_values(f'{var} Amount', ascending=False).iloc[0]
             top_contrib_this_year_name = top_contrib_this_year[f'{prefix} Name']
-            top_contrib_this_year_info = 'Located at zipcode ' + str(top_contrib_this_year[f'{prefix} Street Postal Code']) + ' in ' + str(top_contrib_this_year[f'{prefix} Street City']) + ', ' + str(top_contrib_this_year[f'{prefix} Street State'].upper())
+            top_contrib_this_year_info = 'Located in ' + str(top_contrib_this_year[f'{prefix} Location'])
             try:
                 if top_contrib_this_year[f'{prefix} Employer'] != '':
-                    top_contrib_this_year_info = 'Employed by ' + str(top_contrib_this_year[f'{prefix} Employer']) + ' in ' + str(top_contrib_this_year[f'{prefix} Street City']) + ', ' + str(top_contrib_this_year[f'{prefix} Street State'].upper())
+                    top_contrib_this_year_info = 'Employed by ' + str(top_contrib_this_year[f'{prefix} Employer']) + ' in ' + str(top_contrib_this_year[f'{prefix} Location'])
             except:
                 pass
 
             # Display stats
             col1, col2, col3 = st.columns(3)
-            col1.metric(label=f"Avg Monthly {var} Amount ({this_year})", value='${:,}'.format(avg_amount_this_year), delta='${:,}'.format(avg_amount_diff))
+            col1.metric(label=f"Avg Monthly {var} Amount ({this_year})", value='${:,}'.format(avg_amount_this_year), delta='{:,}'.format(avg_amount_diff))
             col2.metric(label=f"Avg Monthly {var} Count ({this_year})", value='{:,}'.format(avg_count_this_year), delta='{:,}'.format(avg_count_diff))
-            col3.metric(label=f'Top {prefix} ({this_year})', value=top_contrib_this_year_name, delta=top_contrib_this_year_info, delta_color='off')
+            col3.metric(label=f'Top {prefix} ({this_year})', value=top_contrib_this_year_name)
+            # col3.markdown(top_contrib_this_year_info)
+            col3.markdown(f'<p style="position: relative; top:-20px; color:grey">{top_contrib_this_year_info}</p>', unsafe_allow_html=True)
+
 
 
 def display_data(dtype, filername):
@@ -163,87 +206,129 @@ def display_data(dtype, filername):
 
     # Display data table
     if len(filtered_data) > 0:
+        count = len(filtered_data)
+        count_str = '{:,}'.format(count)
         date_min, date_max = filtered_data[f'{var} Dt'].min().strftime(format='%b %d, %Y'), filtered_data[f'{var} Dt'].max().strftime(format='%b %d, %Y')
         for col in [f'{var} Dt', 'Received Dt']:
             filtered_data[col] = pd.to_datetime(filtered_data[col]).apply(lambda x: x.strftime(format='%Y-%m-%d'))
         with st.expander(f'{var}s'):
-            st.markdown(f'**Date range**: {date_min} - {date_max}')
-            data_csv = convert_df(filtered_data.drop(columns='year'))
-            st.download_button(
-                label=f"Download {var.lower()} data",
-                data=data_csv,
-                file_name=f"data_{var.lower()}_{filername}.csv",
-                mime='text/csv'
-            )
-            st.dataframe(filtered_data.fillna(''))
+            if date_min != date_max:
+                st.markdown(f'**{count_str} {var.lower()}s between {date_min} and {date_max}**')
+            elif count == 1:
+                st.markdown(f'**{count_str} {var.lower()} on {date_min}**')
+            else:
+                st.markdown(f'**{count_str} {var.lower()}s on {date_min}**')
+            display_download_button(filtered_data.drop(columns=['year']), f"Download {var.lower()} data", f"data_{var.lower()}_{filername}.csv")
+            st.dataframe(filtered_data.fillna('').drop(columns=['year']))
 
     else:
-        st.write(f'Insufficient {var.lower()} data to display')
+        st.warning(f'No {var.lower()} data to display')
 
 
-def get_common(concat_dfs, year, dtype):
+
+def get_common(concat_dfs, dtype):
 
     var, prefix = dtype[0], dtype[1]
 
-    if year != 'All':
-        concat_dfs = concat_dfs[concat_dfs.year == year]
-    grouped = concat_dfs.fillna('').groupby([col for col in concat_dfs.columns if prefix.lower() in col.lower()]).agg(
-        contrib_amount = (f'{var} Amount', 'sum'), 
-        filers_count = ('Filer Name', 'nunique'), 
-        Filers = ('Filer Name', lambda x: ', '.join(x.unique()))).reset_index()
+    grouped = concat_dfs.fillna('').groupby([col for col in concat_dfs.columns if prefix.lower() in col.lower() or col == 'Filer Name' or col == 'year'])[f'{var} Amount'].sum().reset_index()
 
-    common = grouped[grouped.filers_count > 1]\
-    .rename(columns={'contrib_amount': f'{var}s Total'})\
-    [[f'{prefix} Name', f'{prefix} Persent Type', f'{prefix} Location', f'{var}s Total', 'Filers']].reset_index(drop=True)
+    name_cols = list(grouped['Filer Name'].unique())
+
+    common = grouped.pivot(index=[col for col in concat_dfs.columns if prefix.lower() in col.lower() or col == 'year'], columns='Filer Name', values=f'{var} Amount').reset_index()
+    common.rename(columns={'year': 'Year'}, inplace=True)
+
+    for col in name_cols:
+        common = common[common[col].isna() == False]
 
     for col in common.columns:
         if list(common[col].unique()) == ['']:
             common.drop(columns=[col], inplace=True)
 
+    common.reset_index(drop=True, inplace=True)
+    common.sort_values('Year', ascending=False, inplace=True)
+
     return common
 
 
-def display_common(common, dtype, names):
+
+def display_common(concat_dfs, dtype, names):
+
+    concat_dfs.to_csv(f'{os.getcwd()}/data/source/test_shared.csv')
 
     var, prefix = dtype[0], dtype[1]
 
+    st.markdown(f'**Shared {prefix}s**')
+    common = get_common(concat_dfs, dtype)
     if len(common) > 0:
-        common_csv = convert_df(common)
         names_forfile = '_'.join(names)
-        st.download_button(
-            label=f"Download shared {prefix.lower()}s data",
-            data=common_csv,
-            file_name=f"shared_{prefix.lower()}_{names_forfile}.csv",
-            mime='text/csv'
-        )
+        display_download_button(common, f"Download shared {prefix.lower()}s data", f"shared_{prefix.lower()}s_{names_forfile}.csv")
         st.dataframe(common)
     else:
-        st.write('No data to display')
+        st.write(f'No shared {prefix.lower()}s to display')
 
 
-@st.cache
-def make_chart(concat_dfs, var):
 
-    concat_dfs[f'{var} Dt'] = pd.to_datetime(concat_dfs[f'{var} Dt'])
-    grouped = concat_dfs.groupby(['Filer Name', pd.Grouper(key=f'{var} Dt', freq='m')])[f'{var} Amount'].sum().reset_index()
-    grouped['Filer Name'] = grouped['Filer Name'].apply(lambda x: re.sub("([\(\[]).*?([\)\]])", "", x))
-    chart = alt.Chart(grouped).mark_line().encode(
-                                    x=alt.X(f'{var} Dt', axis=alt.Axis(labelAngle=0), title=''), 
-                                      y=alt.Y(f'{var} Amount', title='', ), 
-                                      color=alt.Color('Filer Name', legend=alt.Legend(title='', labelFontSize=15)),
-                                      tooltip=alt.Tooltip(f'{var} Amount',format=",.2f")
-                                     ).properties(width=1000)
+def make_line_chart(data):
+
+    name_col = data.columns[0]
+    date_col = data.columns[1]
+    value_col = data.columns[2]
+    data[value_col] = data[value_col].astype(float).round(1)
+    data[name_col] = data[name_col].apply(lambda x: x.replace(' ', ' ').replace(',', '').replace('.', ' ')).apply(lambda x: re.sub("([\(\[]).*?([\)\]])", "", x))
+
+    base = alt.Chart(data).encode(
+        x=alt.X(date_col, axis=alt.Axis(format = ("%b %Y")))
+        )
+
+    names = sorted(data[name_col].unique())
+    tooltips = [alt.Tooltip(c, type='quantitative', title=c, format="$,.2f") for c in names]
+    tooltips.insert(0, alt.Tooltip(date_col, title=date_col))
+    selection = alt.selection_single(
+        fields=[date_col], nearest=True, on='mouseover', empty='none', clear='mouseout'
+    )
+
+    lines = base.mark_line(interpolate='catmull-rom').encode(
+        y=alt.Y(value_col, title='', axis=alt.Axis(format="$~s")), 
+        color=alt.Color(name_col, legend=alt.Legend()))
+    points = lines.mark_point().transform_filter(selection)
+
+    rule = base.transform_pivot(
+        pivot=name_col, value=value_col, groupby=[date_col]
+    ).mark_rule().encode(
+        opacity=alt.condition(selection, alt.value(0.3), alt.value(0)),
+        tooltip=tooltips
+    ).add_selection(selection)
+
+    chart = lines + points + rule
+    
     return chart
 
 
 
-def display_chart(concat_dfs, dtype):
+def get_var_totals(concat_dfs, dtype):
 
-    var, prefix = dtype[0], dtype[1]
+    var = dtype[0]
 
-    st.markdown(f'**{var} Monthly Totals ($)**')
-    st.altair_chart(make_chart(concat_dfs, var), use_container_width=True)
-    st.markdown(f'**Shared {prefix}s**')
+    concat_dfs[f'{var} Dt'] = pd.to_datetime(concat_dfs[f'{var} Dt'])
+    grouped = concat_dfs.groupby(['Filer Name', pd.Grouper(key=f'{var} Dt', freq='m')])[f'{var} Amount'].sum().reset_index()
+    grouped[f'{var} Dt'] = pd.to_datetime(grouped[f'{var} Dt'])
+    for_download = grouped.pivot(index=f'{var} Dt', columns='Filer Name', values=f'{var} Amount').reset_index()
+
+    return grouped, for_download
+
+
+
+def display_var_totals_chart(dtype, concat_dfs, names):
+
+    var = dtype[0]
+    names_forfile = '_'.join(names)
+    chart_data, for_download = get_var_totals(concat_dfs, dtype)
+    chart = make_line_chart(chart_data)
+
+    st.markdown(f'**{var} Monthly Totals**')
+    display_download_button(for_download, f"Download {var.lower()} monthly totals data", f"monthly_totals_{var.lower()}_{names_forfile}.csv")
+    st.altair_chart(chart, use_container_width=True)
+
 
 #____________________________________________________________ GET FILER DATA ____________________________________________________________
 
@@ -253,16 +338,24 @@ def get_filer_data():
     filers = load_filers()
 
     # Display filters
-    st.caption('This is a string that explains something above.')
+
     filertypeW = st.radio('Select a filer type', ('INDIVIDUAL', 'ENTITY'))
-    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), label='Select one or more filers by name')
+    if filertypeW == 'INDIVIDUAL':
+        name_help = "Begin typing the filer's LAST NAME to view options"
+    else:
+        name_help = "Begin typing the entity's name to view options"
+    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), 
+    label='Select one or more filers by name', help=name_help)
+
+    if len(filernameW) == 1:
+        st.info('Add another filer to generate comparison data.')
 
     data = []
 
     # Display filertable
     for filername in filernameW:
 
-        st.markdown(f'### {filername}')
+        ids = list(filers[filers['Filer Name'] == filername]['Filer Ident'].unique())
 
         # Redefining dtypes
         contribs=['Contribution', 'Contributor', 'contribs']
@@ -271,10 +364,19 @@ def get_filer_data():
         dtypes = [contribs, expend, loans]
 
         # Filter data
-        ### *************************ADD LOAD WIDGET
-        for dtype in dtypes:
-            filtered_data = filter_data(filername, dtype)
-            dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
+        with st.spinner('Loading data...'):
+            for dtype in dtypes:
+                filtered_data = filter_data(ids, filername, dtype)
+                dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
+
+        
+        # Balance data
+        filtered_balance = filter_balance(ids)
+
+        st.markdown(f'### {filername}')
+
+        # Display balance stats
+        display_balance_stats(filtered_balance)
                 
         # Display stats for each dtype
         for dtype in dtypes:
@@ -286,26 +388,24 @@ def get_filer_data():
         filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
         display_filertable(filertable)
 
+        # Display balance data
+        display_balance_data(filername, filtered_balance)
+
         # Display data
         for dtype in dtypes:
             display_data(dtype, filername)
     
-    return filernameW, data
+    compare_filers(filernameW, data, filers)
 
 #____________________________________________________________ COMPARE FILERS ____________________________________________________________
 
-# Defining dtypes
-contribs=['Contribution', 'Contributor', 'contribs']
-expend = ['Expenditure', 'Payee', 'expend']
-loans = ['Loan', 'Lender', 'loans']
-dtypes = [contribs, expend, loans]
 
-
-def compare_filers(filernameW, data):
+def compare_filers(filernameW, data, filers):
     if len(filernameW) > 1:
 
         st.markdown("""---""")
         st.markdown('<p style="background-color:  #ff4c4c; text-align: center; color:white; font-size: 20px; width:100%;"><b>FILER COMPARISON</b></p>', unsafe_allow_html=True)
+
 
         for dtype in dtypes:
 
@@ -318,35 +418,41 @@ def compare_filers(filernameW, data):
 
                 if len(concat_dfs) >= 10 and concat_dfs['Filer Name'].nunique() > 1:
 
-                # Making main vars
-                    names = [name.split(',')[0] for name in list(concat_dfs['Filer Name'].unique())]
-
-                    # Get years
-                    years_options =['All']
-                    years_options.extend(sorted(concat_dfs.year.unique()))
+                    # Making main vars
+                    names = [re.sub("([\(\[]).*?([\)\]])", "", name.replace(',', '').replace('.', '').replace(' ', '-')).strip() for name in list(concat_dfs['Filer Name'].unique())]
 
                     with st.expander(f'Compare {dtype[0]}s'):
                         # Display chart
-                        display_chart(concat_dfs, dtype)
+                        display_var_totals_chart(dtype, concat_dfs, names)
 
                         # Display common
-                        common = get_common(concat_dfs, 'All', dtype)
-                        if len(common) > 0:
-                            year = st.selectbox(f'Select a year to view common {dtype[0].lower()}s', years_options)
-                            common = get_common(concat_dfs, year, dtype)
-                            display_common(common, dtype, names)
+                        display_common(concat_dfs, dtype, names)
                 else:
-                    st.write(f'Insufficient data to compare {dtype[0].lower()}s')
+                    st.warning(f'Insufficient data to compare {dtype[0].lower()}s')
             else:
-                st.write(f'Insufficient data to compare {dtype[0].lower()}s')
-
+                st.warning(f'Insufficient data to compare {dtype[0].lower()}s')
 
 
 def main():
+    st.image('https://upload.wikimedia.org/wikipedia/commons/d/d9/Austin_American-Statesman_%282019-10-31%29.svg', width=300)
+    st.title('Campaign Finance Data Tool')
 
-    filernameW, els = get_filer_data()
-    compare_filers(filernameW, els)
+    with request.urlopen('https://data-statesman.s3.amazonaws.com/tec-campaign-finance/documentation/last_update.txt') as f:
+        last_update = f.read().decode('utf-8')
+
+    st.markdown(f'##### Last update: {last_update}')
+    st.markdown("""
+    This application processes and visualizes the **last five years** of campaign finance data released by the Texas Ethics Commission. 
+    The raw data is available for download [here](https://www.ethics.state.tx.us/data/search/cf/CFS-ReadMe.txt). According to your selection of filers, 
+    the application will display contribution, expenditure and loan data for each filer
+    and then compare the filers you selected and their contributors, payees and lenders.
+
+    To begin, select one or more filers by **TYPE** and **NAME**. 
+
+    """)
+    get_filer_data()
     st.markdown(footer,unsafe_allow_html=True)
 
 
-main()
+if __name__ == '__main__':
+    main()

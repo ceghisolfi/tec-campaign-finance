@@ -39,7 +39,7 @@ loans_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loan
 # debts_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 
 #             'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst']
 #             # 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
-cover_cols = ['filerIdent', 'periodStartDt', 'periodEndDt', 
+cover_cols = ['filerIdent', 'filerName', 'periodStartDt', 'periodEndDt', 'receivedDt', 'timelyCorrectionFlag', 'infoOnlyFlag',
         'unitemizedContribAmount', 'totalContribAmount', # positive
         'unitemizedExpendAmount', 'totalExpendAmount', # negative
         'loanBalanceAmount', # negative
@@ -59,6 +59,13 @@ def sorted_cols(el):
 
 
 
+def clean_date(date, comp_date):
+    if date > date.today():
+        date = pd.Timestamp(comp_date.year, date.month, date.day)
+    return date
+
+
+
 def make_sorted_cols(data):
     cols = list(data.columns)
     cols.sort(key=sorted_cols)
@@ -73,12 +80,13 @@ def clean_filer_data(file):
         'filerHoldOfficeDistrict', 'contestSeekOfficeCd', 'contestSeekOfficeDistrict', 'filerEffStartDt', 'filerEffStopDt']]\
         .sort_values('filerEffStartDt')\
         .fillna('')
+    filers.filerName = filers.filerName.str.strip()
 
     return filers
 
 
 
-def clean_and_export(var, zf, filers, filenames, cols, datecols):
+def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
     """
     Given series of filenames or filename patterns for a var (e.g. contributions), 
     reads and merges each df with filers df, concatenates dfs, and exports last five years of data for that var.
@@ -143,31 +151,50 @@ def clean_and_export(var, zf, filers, filenames, cols, datecols):
         data[prefix + 'Name'] = np.where(data[prefix + 'NameOrganization'] != '', data[prefix + 'NameOrganization'], data[prefix + 'Name'])
         data.drop(columns=[prefix + 'NameOrganization'], inplace=True)
 
+    # Consolidating location cols
+    location_cols = [f'{prefix}StreetCity', f'{prefix}StreetStateCd', f'{prefix}StreetPostalCode', f'{prefix}StreetCountryCd']
+    data[location_cols] = \
+        data[location_cols].fillna('').astype(str)
+    data[f'{prefix}Location'] = data[f'{prefix}StreetCity'] + ', ' + data[f'{prefix}StreetStateCd'] + ' ' + \
+        data[f'{prefix}StreetPostalCode'] + ', ' + data[f'{prefix}StreetCountryCd']
+    data.drop(columns=location_cols, inplace=True)
+
     # Cleaning col names
     print('\tCleaning col names', " "*80, end='\r')
     data.columns = [re.sub( '(?<!^)(?=[A-Z])', '_', col.replace('Cd', '')).lower() for col in data.columns]
     data = make_sorted_cols(data)
 
+
     # Downloading data
-    for letter, group in data.groupby(data.filer_name.str[:3]):
-        group.to_csv(f'{os.getcwd()}/data/processed/{var}/{var}_{letter}.csv', index=False)
-        print('\tDonwloaded', letter, end='\r')
+    for id, group in data.groupby(data.filer_ident):
+        group.to_csv(f'{os.getcwd()}/data/processed/{var}/{var}_{id}.csv', index=False)
+        print('\tDonwloaded', id, ' '*80, end='\r')
+
+
+
+def clean_and_export_cover(zf):
+
+    # Loading data
+    cover = pd.read_csv(zf.open('cover.csv'), usecols=cover_cols, parse_dates = ['receivedDt'], dtype={'filerIdent': str, 'periodStartDt': str, 'periodEndDt': str})\
+    .dropna(axis=1,how='all').sort_values(['receivedDt', 'timelyCorrectionFlag'], ascending=False)
     
-    return data
-
-
-
-def clean_cover(zf):
-    cover = pd.read_csv(zf.open('filers.csv'), usecols=cover_cols)
+    # Filering and calculating balance
+    cover = cover[cover.infoOnlyFlag == 'N']
+    cover = cover.drop_duplicates(['filerIdent', 'receivedDt'], keep='first')
     for col in ['periodStartDt', 'periodEndDt']:
-        cover[col] = pd.to_datetime(cover[col], errors='coerce')
+            cover[col] = pd.to_datetime(cover[col], errors='coerce')
     cover['balance'] = cover[['unitemizedContribAmount', 'totalContribAmount', 'contribsMaintainedAmount', 'totalInterestEarnedAmount']].fillna(0).sum(axis=1) - \
-        cover[['unitemizedExpendAmount', 'totalExpendAmount', 'loanBalanceAmount', 'unitemizedLoanAmount']].fillna(0).sum(axis=1)
+            cover[['unitemizedExpendAmount', 'totalExpendAmount', 'loanBalanceAmount', 'unitemizedLoanAmount']].fillna(0).sum(axis=1)
+    cover = cover[['filerIdent', 'filerName', 'receivedDt', 'periodStartDt', 'periodEndDt', 'balance']]
 
-    cover = cover[['filerIdent', 'periodStartDt', 'periodEndDt', 'balance']]
-    cover.columns = [re.sub( '(?<!^)(?=[A-Z])', '_', col).lower() for col in cover.columns]
-    
-    cover.to_csv(f'{os.getcwd()}/data/processed/cover.csv')
+    # Merging with filers
+    cover.columns = [re.sub('(?<!^)(?=[A-Z])', '_', col).lower() for col in cover.columns]
+
+    # Downloading data
+    for id, group in cover.groupby(cover.filer_ident):
+        group.to_csv(f'{os.getcwd()}/data/processed/balance/balance_{id}.csv', index=False)
+        print('\tDonwloaded', id, ' '*80, end='\r')
+
 
 
 def main():
@@ -178,24 +205,26 @@ def main():
     print('Updating data')
     zipfile = BytesIO(requests.get('https://www.ethics.state.tx.us/data/search/cf/TEC_CF_CSV.zip').content)
     zf = ZipFile(zipfile)
-    # zf = ZipFile(f'{os.getcwd()}/data/source/TEC_CF.zip')
                 
     # Loading filer data
     filers = make_sorted_cols(clean_filer_data(zf.open('filers.csv')))
+    filers = filers[(filers['filerName'].str.lower().str.contains('use, do not|not to be use|do not') == False)]
     filers.to_csv(f'{os.getcwd()}/data/processed/filers.csv', index=False)
 
-    # Processing and downloading data
-    clean_and_export('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
-    clean_and_export('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
-    clean_and_export('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
-
     # Cleaning and downloading cover data
+    clean_and_export_cover(zf)
 
-    with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
-        f.write(date.today().strftime(format='%b %d, %Y'))
+    # # Processing and downloading data
+    # clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
+    # clean_and_export_vardata('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
+    # clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
 
-    executionTime = (time.time() - startTime)
-    print('Execution time in seconds: ' + str(executionTime))
+    # # Updating last update txt file
+    # with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
+    #     f.write(date.today().strftime(format='%b %d, %Y'))
+
+    # executionTime = (time.time() - startTime)
+    # print('Execution time in seconds: ' + str(executionTime))
 
 
 if __name__ == '__main__':
