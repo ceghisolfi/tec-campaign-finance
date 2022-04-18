@@ -1,14 +1,14 @@
-name: Data Update Automation
+name: Update Data Automation
 
 on:
   push:
     branches:
       - master
   schedule:
-    - cron: "0 0 * * *" # Runs at 03:00 AM (UTC) every Monday, Wednesday, and Friday (Check https://crontab.guru/)
+    - cron: "0 3 * * 1,3,5" # Runs at 03:00 AM (UTC) every Monday, Wednesday, and Friday (Check https://crontab.guru/)
 
 jobs:
-  data-update-automation:
+  update-data-automation:
     runs-on: macos-latest
     steps:
       - name: 🍽️ Checkout the repo
@@ -21,14 +21,8 @@ jobs:
         with:
           python-version: '3.8'
 
-     - name: 💿 Install pipenv and dependencies
-        run: pip install pipenv
-        copy: Pipfile .
-        copy: Pipfile.lock .
-        run: pipenv install — system — deploy
-
       - name: 📥 Download the Python script needed for automation
-        run:  curl https://github.com/ceghisolfi/tec-campaign-finance/blob/master/etl/update_data.py -o update_data.py
+        run:  curl https://github.com/ceghisolfi/tec-campaign-finance/test.py -o test.py
 
       - name: 🚀 Run Automation
-        run: python update_data.py
+        run: python test.py
