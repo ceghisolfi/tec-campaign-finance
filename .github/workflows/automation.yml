@@ -17,12 +17,12 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: 🍽️ Checkout the repo
+      - name: Checkout the repo
         uses: actions/checkout@master
         with:
           fetch-depth: 1
 
-      - name: 🐍 Set up Python 3.8
+      - name: Set up Python 3.8
         uses: actions/setup-python@v2
         with:
           python-version: '3.8'
@@ -33,18 +33,18 @@ jobs:
               aws configure set aws_access_key_id  ${{secrets.AWS_ACCESS_KEY_ID}} --profile default
               aws configure set aws_secret_access_key  ${{secrets.AWS_SECRET_ACCESS_KEY}} --profile default
 
-      - name: Install datakit, pandas
+      - name: Install datakit, pandas, requests
         run: |
               sudo pip install datakit-core datakit-project datakit-data 
               pip install pandas
               pip install requests
-              
+
       - name: Pull data
         run: |
               datakit data init
               datakit data pull
 
-      - name: 🚀 Run Data Update script
+      - name: Run data update script
         run: python ./etl/update_data.py
 
       - name: Push data

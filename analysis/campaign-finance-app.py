@@ -351,46 +351,49 @@ def get_filer_data():
 
     # Display filertable
     for filername in filernameW:
+        try:
+            ids = list(filers[filers['Filer Name'] == filername]['Filer Ident'].unique())
 
-        ids = list(filers[filers['Filer Name'] == filername]['Filer Ident'].unique())
+            # Redefining dtypes
+            contribs=['Contribution', 'Contributor', 'contribs']
+            expend = ['Expenditure', 'Payee', 'expend']
+            loans = ['Loan', 'Lender', 'loans']
+            dtypes = [contribs, expend, loans]
 
-        # Redefining dtypes
-        contribs=['Contribution', 'Contributor', 'contribs']
-        expend = ['Expenditure', 'Payee', 'expend']
-        loans = ['Loan', 'Lender', 'loans']
-        dtypes = [contribs, expend, loans]
+            # Filter data
+            with st.spinner('Loading data...'):
+                for dtype in dtypes:
+                    filtered_data = filter_data(ids, filername, dtype)
+                    dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
 
-        # Filter data
-        with st.spinner('Loading data...'):
+            
+            # Balance data
+            filtered_balance = filter_balance(ids)
+
+            st.markdown(f'### {filername}')
+
+            # Display balance stats
+            display_balance_stats(filtered_balance)
+                    
+            # Display stats for each dtype
             for dtype in dtypes:
-                filtered_data = filter_data(ids, filername, dtype)
-                dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
+                if len(dtype[3]) > 0: # filtered_data is dataframe
+                    data.append([dtype[0], dtype[3]])
+                    display_stats(dtype)
 
-        
-        # Balance data
-        filtered_balance = filter_balance(ids)
+            # Display filertable
+            filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
+            display_filertable(filertable)
 
-        st.markdown(f'### {filername}')
+            # Display balance data
+            display_balance_data(filername, filtered_balance)
 
-        # Display balance stats
-        display_balance_stats(filtered_balance)
-                
-        # Display stats for each dtype
-        for dtype in dtypes:
-            if len(dtype[3]) > 0: # filtered_data is dataframe
-                data.append([dtype[0], dtype[3]])
-                display_stats(dtype)
+            # Display data
+            for dtype in dtypes:
+                display_data(dtype, filername)
+        except:
+            st.warning(f'No data found for {filername}')
 
-        # Display filertable
-        filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
-        display_filertable(filertable)
-
-        # Display balance data
-        display_balance_data(filername, filtered_balance)
-
-        # Display data
-        for dtype in dtypes:
-            display_data(dtype, filername)
     
     compare_filers(filernameW, data, filers)
 
