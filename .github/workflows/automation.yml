@@ -11,18 +11,14 @@ jobs:
   update-data-automation:
     runs-on: macos-latest
     steps:
-      - name: 🍽️ Checkout the repo
-        uses: actions/checkout@master
-        with:
-          fetch-depth: 1
-
-      - name: 🐍 Set up Python 3.8
+      - name: checkout repo content
+            uses: actions/checkout@v2 # checkout the repository content to github runner.
+      - name: setup python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: 3.8 #install the python needed
+      - name: execute py script # run the run.py to get the latest data
+        run: |
+          python test.py
 
-      - name: 📥 Download the Python script needed for automation
-        run:  curl https://github.com/ceghisolfi/tec-campaign-finance/blob/master/test.py -o test.py
 
-      - name: 🚀 Run Automation
-        run: python test.py
