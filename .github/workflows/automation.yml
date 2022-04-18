@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: '3.8'
 
-      - name: 📥 Download the Python script needed for automation
-        run:  curl https://github.com/ceghisolfi/tec-campaign-finance/test.py -o test.py
+      # - name: 📥 Download the Python script needed for automation
+      #   run:  curl https://github.com/ceghisolfi/tec-campaign-finance/test.py -o test.py
 
       - name: 🚀 Run Automation
-        run: python test.py
+        run: python ~/test.py
