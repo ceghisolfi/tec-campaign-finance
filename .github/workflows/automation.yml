@@ -21,6 +21,13 @@ jobs:
         with:
           python-version: '3.8'
 
+      - name: Install datakit
+        run: sudo pip install datakit-core datakit-project datakit-data
+
+      - name: Pull data
+        run: datakit data init
+        run: datakit data pull
+
       - name: 🚀 Run Automation
         run: python ./etl/test.py
 
