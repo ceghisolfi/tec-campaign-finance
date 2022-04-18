@@ -27,19 +27,24 @@ jobs:
         run: |
               sudo pip install datakit-core datakit-project datakit-data
 
-      - name: Set AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      # - name: Set AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1 # use your region here.
+
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@master
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # use your region here.
+          role-to-assume: arn:aws:iam::852692342265:role/github-actions-role
+          aws-region: us-east-1
 
       - name: Print credentials
         run: aws sts get-caller-identity
 
       - name: Pull data
         run: |
-              aws configure
               datakit data init
               datakit data pull
               cd data
