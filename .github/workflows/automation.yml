@@ -43,6 +43,8 @@ jobs:
       - name: Pull data
         run: |
               aws configure list
+              ls
+              cat ~/.datakit/plugins/datakit-data/config.json
               datakit data init
               datakit data pull
               cd data
