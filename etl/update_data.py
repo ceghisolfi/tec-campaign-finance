@@ -1,6 +1,6 @@
 import os 
 import requests
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
 from datetime import date
@@ -214,8 +214,11 @@ def main():
     clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
 
     # Updating last update txt file
+    timezone_offset = -5.0
+    tzinfo = timezone(timedelta(hours=timezone_offset))
+    last_update = datetime.now(tzinfo).strftime(format='%b %d, %Y at %H:%M %p')
     with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
-        f.write(date.today().strftime(format='%b %d, %Y'))
+        f.write(last_update)
 
     executionTime = (time.time() - startTime)
     print('Execution time in seconds: ' + str(executionTime))

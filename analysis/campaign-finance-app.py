@@ -1,15 +1,10 @@
 import pandas as pd
-import numpy as np
 import re
-import os
-from zipfile import ZipFile
 from csv import reader
 import altair as alt
 import streamlit as st
-import warnings
+from pandas.api.types import is_numeric_dtype
 from urllib import request
-warnings.filterwarnings('ignore')
-import time
 
 # Page settings
 st.set_page_config(
@@ -91,10 +86,13 @@ def load_filers():
 
 
 def filter_balance(ids):
-    balance = pd.concat([pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/balance/balance_{id}.csv', dtype={'filer_ident': str}, parse_dates=['received_dt']) for id in ids])
-    balance.columns = [col.replace('_', ' ').title() for col in balance.columns]
+    try:
+        balance = pd.concat([pd.read_csv(f'https://data-statesman.s3.amazonaws.com/tec-campaign-finance/processed/balance/balance_{id}.csv', dtype={'filer_ident': str}, parse_dates=['received_dt']) for id in ids])
+        balance.columns = [col.replace('_', ' ').title() for col in balance.columns]
 
-    return balance
+        return balance
+    except:
+        return pd.DataFrame()
 
 
 
@@ -154,6 +152,8 @@ def display_balance_data(filername, filtered_balance):
             - (Total Expenditures + Total Unitemized Expenditures + Total Outstanding Loans + Total Unitemized Loans)')
             display_download_button(filtered_balance, f"Download balance data", f"balance_{filername}.csv")
             st.dataframe(filtered_balance)
+    else:
+        st.warning('No balance data to display')
 
 
 
@@ -198,6 +198,26 @@ def display_stats(dtype):
 
 
 
+def group_data(var, prefix, filtered_data):
+    filtered_data.fillna('', inplace=True)
+
+    for col in filtered_data.columns:
+        if list(filtered_data[col].unique()) == ['']:
+            filtered_data.drop(columns=[col], inplace=True)
+    grouped = filtered_data.groupby([col for col in filtered_data.columns if prefix in col or col == 'year'])\
+    .agg(count = ('Report Info Ident', 'count'), amount = (f'{var} Amount', 'sum'))\
+    .reset_index()\
+    .rename(columns={'count': var + 's', 'amount':f'{var} Amount' })\
+    .pivot(index=[col for col in filtered_data.columns if prefix in col], columns='year', values=[f'{var} Amount', var + 's'])\
+    .fillna(0)
+
+    if len(grouped) > 0:
+        grouped.sort_values(grouped.columns[-1], ascending=False, inplace=True)
+
+    return grouped
+
+
+
 def display_data(dtype, filername):
 
     # Load dtype vars
@@ -207,18 +227,36 @@ def display_data(dtype, filername):
     if len(filtered_data) > 0:
         count = len(filtered_data)
         count_str = '{:,}'.format(count)
+
+        grouped_data = group_data(var, prefix, filtered_data)
+        grouped_count = len(grouped_data)
+        grouped_count_str = '{:,}'.format(grouped_count)
+
         date_min, date_max = filtered_data[f'{var} Dt'].min().strftime(format='%b %d, %Y'), filtered_data[f'{var} Dt'].max().strftime(format='%b %d, %Y')
+
         for col in [f'{var} Dt', 'Received Dt']:
             filtered_data[col] = pd.to_datetime(filtered_data[col]).apply(lambda x: x.strftime(format='%Y-%m-%d'))
+        for col in [col for col in filtered_data.columns if prefix in col]:
+            filtered_data[col] = filtered_data[col].fillna('')
         with st.expander(f'{var}s'):
+
+            # Data
+            st.markdown(f'**All {var}s**')
             if date_min != date_max:
-                st.markdown(f'**{count_str} {var.lower()}s between {date_min} and {date_max}**')
+                st.markdown(f'{count_str} {var.lower()}s between {date_min} and {date_max}')
             elif count == 1:
-                st.markdown(f'**{count_str} {var.lower()} on {date_min}**')
+                st.markdown(f'{count_str} {var.lower()} on {date_min}')
             else:
-                st.markdown(f'**{count_str} {var.lower()}s on {date_min}**')
+                st.markdown(f'{count_str} {var.lower()}s on {date_min}')
             display_download_button(filtered_data.drop(columns=['year']), f"Download {var.lower()} data", f"data_{var.lower()}_{filername}.csv")
             st.dataframe(filtered_data.fillna('').drop(columns=['year']))
+
+            # Grouped data
+            st.markdown(f'**Unique {prefix}s**')
+            st.markdown(f'{grouped_count_str} unique {prefix.lower()}s')
+            display_download_button(grouped_data.reset_index().reset_index(drop=True), f"Download unique {prefix.lower()}s data", f"{prefix.lower()}_{filername}.csv")
+            st.dataframe(grouped_data)
+
 
     else:
         st.warning(f'No {var.lower()} data to display')
@@ -351,48 +389,46 @@ def get_filer_data():
 
     # Display filertable
     for filername in filernameW:
-        try:
-            ids = list(filers[filers['Filer Name'] == filername]['Filer Ident'].unique())
 
-            # Redefining dtypes
-            contribs=['Contribution', 'Contributor', 'contribs']
-            expend = ['Expenditure', 'Payee', 'expend']
-            loans = ['Loan', 'Lender', 'loans']
-            dtypes = [contribs, expend, loans]
+        ids = list(filers[filers['Filer Name'] == filername]['Filer Ident'].unique())
 
-            # Filter data
-            with st.spinner('Loading data...'):
-                for dtype in dtypes:
-                    filtered_data = filter_data(ids, filername, dtype)
-                    dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
+        # Redefining dtypes
+        contribs=['Contribution', 'Contributor', 'contribs']
+        expend = ['Expenditure', 'Payee', 'expend']
+        loans = ['Loan', 'Lender', 'loans']
+        dtypes = [contribs, expend, loans]
 
-            
-            # Balance data
-            filtered_balance = filter_balance(ids)
-
-            st.markdown(f'### {filername}')
-
-            # Display balance stats
-            display_balance_stats(filtered_balance)
-                    
-            # Display stats for each dtype
+        # Filter data
+        with st.spinner('Loading data...'):
             for dtype in dtypes:
-                if len(dtype[3]) > 0: # filtered_data is dataframe
-                    data.append([dtype[0], dtype[3]])
-                    display_stats(dtype)
+                filtered_data = filter_data(ids, filername, dtype)
+                dtype.append(filtered_data) ## dtype format now [var, prefix, varshort, filtered_data]
 
-            # Display filertable
-            filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
-            display_filertable(filertable)
+        
+        # Balance data
+        filtered_balance = filter_balance(ids)
 
-            # Display balance data
-            display_balance_data(filername, filtered_balance)
+        st.markdown(f'### {filername}')
 
-            # Display data
-            for dtype in dtypes:
-                display_data(dtype, filername)
-        except:
-            st.warning(f'No data found for {filername}')
+        # Display balance stats
+        display_balance_stats(filtered_balance)
+                
+        # Display stats for each dtype
+        for dtype in dtypes:
+            if len(dtype[3]) > 0: # filtered_data is dataframe
+                data.append([dtype[0], dtype[3]])
+                display_stats(dtype)
+
+        # Display filertable
+        filertable = filers[filers['Filer Name'] == filername].reset_index(drop=True).dropna(how='all', axis=1)
+        display_filertable(filertable)
+
+        # Display balance data
+        display_balance_data(filername, filtered_balance)
+
+        # Display data
+        for dtype in dtypes:
+            display_data(dtype, filername)
 
     
     compare_filers(filernameW, data, filers)
@@ -444,8 +480,8 @@ def main():
     st.markdown("""
     This application processes and visualizes the **last five years** of campaign finance data released by the Texas Ethics Commission. 
     The raw data is available for download [here](https://www.ethics.state.tx.us/data/search/cf/CFS-ReadMe.txt). According to your selection of filers, 
-    the application will display contribution, expenditure and loan data for each filer
-    and then compare the filers you selected and their contributors, payees and lenders.
+    the application will display balance, contribution, expenditure and loan data for each filer
+    and then compare totals for the filers you selected.
 
     To begin, select one or more filers by **TYPE** and **NAME**. 
 
