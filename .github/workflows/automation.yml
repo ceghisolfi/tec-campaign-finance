@@ -22,7 +22,7 @@ jobs:
           python-version: '3.8'
 
       - name: 🚀 Run Automation
-        run: python test.py
+        run: python ./etl/test.py
 
 
         
