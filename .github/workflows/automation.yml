@@ -27,7 +27,7 @@ jobs:
       - name: Pull data
         run: |
         datakit data init
-        run: datakit data pull
+        datakit data pull
 
       - name: 🚀 Run Automation
         run: python ./etl/test.py
