@@ -39,7 +39,7 @@ jobs:
           aws-region: us-east-1 # use your region here.
 
       - name: Print credentials
-      - run: aws sts get-caller-identity
+        run: aws sts get-caller-identity
 
       - name: Pull data
         run: |
