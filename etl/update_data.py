@@ -1,7 +1,5 @@
 import os 
 import requests
-from urllib.request import urlretrieve
-from glob import glob
 from datetime import date
 import numpy as np
 import pandas as pd
@@ -10,10 +8,6 @@ from io import BytesIO
 import re
 import time
 from zipfile import ZipFile
-import ssl
-import warnings
-warnings.filterwarnings('ignore')
-ssl._create_default_https_context = ssl._create_unverified_context
 
 """
 OBJECTIVE:
@@ -214,17 +208,17 @@ def main():
     # Cleaning and downloading cover data
     clean_and_export_cover(zf)
 
-    # # Processing and downloading data
-    # clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
-    # clean_and_export_vardata('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
-    # clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
+    # Processing and downloading data
+    clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
+    clean_and_export_vardata('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
+    clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
 
-    # # Updating last update txt file
-    # with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
-    #     f.write(date.today().strftime(format='%b %d, %Y'))
+    # Updating last update txt file
+    with open(f'{os.getcwd()}/data/documentation/last_update.txt', 'w') as f:
+        f.write(date.today().strftime(format='%b %d, %Y'))
 
-    # executionTime = (time.time() - startTime)
-    # print('Execution time in seconds: ' + str(executionTime))
+    executionTime = (time.time() - startTime)
+    print('Execution time in seconds: ' + str(executionTime))
 
 
 if __name__ == '__main__':

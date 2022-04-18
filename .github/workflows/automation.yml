@@ -9,7 +9,7 @@ on:
     branches:
       - master
   schedule:
-    - cron: "0 3 * * 1,3,5" # Runs at 03:00 AM (UTC) every Monday, Wednesday, and Friday (Check https://crontab.guru/)
+    - cron: "0 3 * * 1,3,5" # Runs at 03:00 AM (UTC) every Monday, Wednesday, and Friday
 
 jobs:
   update-data-automation:
@@ -33,27 +33,21 @@ jobs:
               aws configure set aws_access_key_id  ${{secrets.AWS_ACCESS_KEY_ID}} --profile default
               aws configure set aws_secret_access_key  ${{secrets.AWS_SECRET_ACCESS_KEY}} --profile default
 
-      - name: Print credentials
-        run: aws sts get-caller-identity
-
-
-      - name: Install datakit
+      - name: Install datakit, pandas
         run: |
-              sudo pip install datakit-core datakit-project datakit-data
-
-      # - name: configure aws credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     role-to-assume: arn:aws:iam::852692342265:role/github-actions-role
-      #     role-duration-seconds: 900 # the ttl of the session, in seconds.
-      #     aws-region: us-east-1 # use your region here.
-
+              sudo pip install datakit-core datakit-project datakit-data 
+              pip install pandas
+              pip install requests
+              
       - name: Pull data
         run: |
               datakit data init
               datakit data pull
-              cd data
-              ls
 
-      - name: 🚀 Run Automation
-        run: python ./etl/test.py
+      - name: 🚀 Run Data Update script
+        run: python ./etl/update_data.py
+
+      - name: Push data
+        run: |
+              datakit data init
+              datakit data push
