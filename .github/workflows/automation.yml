@@ -25,6 +25,8 @@ jobs:
         run: |
               sudo pip install datakit-core datakit-project datakit-data
               datakit data init
+              datakit data pull
+              cd data
               ls
 
       - name: 🚀 Run Automation
