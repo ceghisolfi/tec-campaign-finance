@@ -40,6 +40,14 @@ jobs:
 
       - name: Pull data
         run: |
+              mkdir -p ~/.aws
+              touch ~/.aws/credentials
+
+              echo "[default]
+              aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+              aws_secret_access_key = ${{ secrets.AWS_SECRET_KEY_ID }}
+              region = us-east-1
+
               aws configure
               datakit data init
               datakit data pull
