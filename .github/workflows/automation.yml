@@ -38,21 +38,23 @@ jobs:
           role-duration-seconds: 2000 # the ttl of the session, in seconds.
           aws-region: us-east-1 # use your region here.
 
-      - name: Pull data
-        run: |
-              mkdir -p ~/.aws
-              touch ~/.aws/credentials
+      - run: aws sts get-caller-identity
 
-              echo "[default]
-              aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-              aws_secret_access_key = ${{ secrets.AWS_SECRET_KEY_ID }}
-              region = us-east-1
+      # - name: Pull data
+      #   run: |
+      #         mkdir -p ~/.aws
+      #         touch ~/.aws/credentials
 
-              aws configure
-              datakit data init
-              datakit data pull
-              cd data
-              ls
+      #         echo "[default]
+      #         aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #         aws_secret_access_key = ${{ secrets.AWS_SECRET_KEY_ID }}
+      #         region = us-east-1
+
+      #         aws configure
+      #         datakit data init
+      #         datakit data pull
+      #         cd data
+      #         ls
 
       - name: 🚀 Run Automation
         run: python ./etl/test.py
