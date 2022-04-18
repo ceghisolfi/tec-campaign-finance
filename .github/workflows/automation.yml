@@ -1,5 +1,9 @@
 name: Update Data Automation
 
+permissions:
+  id-token: write # required to use OIDC authentication
+  contents: read # required to checkout the code from the repo
+
 on:
   push:
     branches:
@@ -31,15 +35,15 @@ jobs:
         run: |
               sudo pip install datakit-core datakit-project datakit-data
 
-      - name: Configure AWS Credentials
+      - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::852692342265:role/cron-jobs-role
-          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::852692342265:role/github-actions-role
+          role-duration-seconds: 2000 # the ttl of the session, in seconds.
+          aws-region: us-east-1 # use your region here.
 
       - name: Pull data
         run: |
-              cat ~/.aws/config
               datakit data init
               datakit data pull
               cd data
