@@ -34,8 +34,8 @@ jobs:
       - name: configure aws credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::852692342265:role/github-actions-role
-          role-duration-seconds: 2000 # the ttl of the session, in seconds.
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: us-east-1 # use your region here.
 
       - run: aws sts get-caller-identity
