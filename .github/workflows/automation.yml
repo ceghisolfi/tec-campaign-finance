@@ -40,21 +40,13 @@ jobs:
 
       - run: aws sts get-caller-identity
 
-      # - name: Pull data
-      #   run: |
-      #         mkdir -p ~/.aws
-      #         touch ~/.aws/credentials
-
-      #         echo "[default]
-      #         aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #         aws_secret_access_key = ${{ secrets.AWS_SECRET_KEY_ID }}
-      #         region = us-east-1
-
-      #         aws configure
-      #         datakit data init
-      #         datakit data pull
-      #         cd data
-      #         ls
+      - name: Pull data
+        run: |
+              aws configure list
+              datakit data init
+              datakit data pull
+              cd data
+              ls
 
       - name: 🚀 Run Automation
         run: python ./etl/test.py
