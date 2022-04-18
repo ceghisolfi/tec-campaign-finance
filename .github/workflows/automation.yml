@@ -24,11 +24,6 @@ jobs:
       - name: Install datakit
         run: sudo pip install datakit-core datakit-project datakit-data
 
-      - name: Pull data
-        run: |
-        datakit data init
-        datakit data pull
-
       - name: 🚀 Run Automation
         run: python ./etl/test.py
 
