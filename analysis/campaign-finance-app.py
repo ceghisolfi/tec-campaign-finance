@@ -374,13 +374,11 @@ def get_filer_data():
 
     # Display filters
 
-    filertypeW = st.radio('Select a filer type', ('INDIVIDUAL', 'ENTITY'))
-    if filertypeW == 'INDIVIDUAL':
-        name_help = "Begin typing the filer's LAST NAME to view options"
-    else:
-        name_help = "Begin typing the entity's name to view options"
-    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'] == filertypeW]['Filer Name'].unique()), 
-    label='Select one or more filers by name', help=name_help)
+    filertypeW = st.multiselect(options=['INDIVIDUAL', 'ENTITY'], 
+    label='Select one or more filer types')
+
+    filernameW = st.multiselect(options=list(filers[filers['Filer Persent Type'].isin(filertypeW)]['Filer Name'].unique()), 
+    label='Select one or more filers by name', help="Begin tying the entity's name or the filer's LAST NAME to view options")
 
     if len(filernameW) == 1:
         st.info('Add another filer to generate comparison data.')
