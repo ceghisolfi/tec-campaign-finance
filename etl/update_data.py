@@ -209,8 +209,8 @@ def main():
     clean_and_export_cover(zf)
 
     # Processing and downloading data
-    clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)] + ['cont_ss.csv', 'cont_t.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
-    clean_and_export_vardata('expend', zf, filers, ['expend_*.csv', 'expn_t.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
+    clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
+    clean_and_export_vardata('expend', zf, filers, ['expend_*.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
     clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
 
     # Updating last update txt file
