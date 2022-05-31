@@ -16,18 +16,18 @@ Grouped by individual, sorted by amount and date
 """
 
 # Cols of interest
-contribs_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'contributionDt', 'contributionAmount', 
+contribs_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'contributionDt', 'contributionAmount', 
             'contributorPersentTypeCd', 'contributorNameOrganization', 
             'contributorNameLast', 'contributorNameFirst', 'contributorEmployer', 'contributorStreetCity',
             'contributorStreetPostalCode', 'contributorStreetStateCd', 'contributorStreetCountryCd']
-expend_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'expendDt', 'expendAmount', 
+expend_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'expendDt', 'expendAmount', 
             'expendDescr', 'expendCatCd', 'politicalExpendCd',
             'payeePersentTypeCd', 'payeeNameOrganization', 'payeeNameLast', 'payeeNameFirst',
             'payeeStreetCity', 'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
 # travel_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'parentDt', 'parentType', 'parentId', 
 #             'transportationTypeCd', 'transportationTypeDescr', 'departureCity', 'arrivalCity', 'departureDt', 'arrivalDt',
 #             'travelPurpose']
-loans_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 'loanDt', 'loanAmount',
+loans_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'loanInfoId', 'loanDt', 'loanAmount',
             'lenderPersentTypeCd', 'lenderNameOrganization', 'lenderNameLast', 'lenderNameFirst', 'lenderEmployer',
             'lenderStreetCity', 'lenderStreetPostalCode', 'lenderStreetStateCd', 'lenderStreetCountryCd']
 # debts_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'loanInfoId', 
@@ -130,6 +130,7 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
         data[col] = data[col].fillna('')
         if 'Type' not in col:
             data[col] = data[col].apply(lambda x: x.title().replace(r'\r+|\n+|\t+','').replace(r'[^A-Za-z0-9 ]+', '').strip())
+    data = data[data.infoOnlyFlag == 'N']
 
     # Consolidating name cols
     print('\tConsolidating name cols', " "*80, end='\r')
@@ -204,6 +205,7 @@ def main():
     filers = make_sorted_cols(clean_filer_data(zf.open('filers.csv')))
     filers = filers[(filers['filerName'].str.lower().str.contains('use, do not|not to be use|do not') == False)]
     filers.to_csv(f'{os.getcwd()}/data/processed/filers.csv', index=False)
+    filers = filers.sort_values('filerEffStartDt').drop_duplicates(subset=['filerIdent'], keep='last')
 
     # Cleaning and downloading cover data
     clean_and_export_cover(zf)
