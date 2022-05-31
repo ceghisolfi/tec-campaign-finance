@@ -104,19 +104,19 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
             for file in files:
                 print('\tLoading', file.split('/')[-1], " "*80, end='\r')
                 df = pd.read_csv(zf.open(file), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
-                try:
-                    df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
-                except:
-                    print('\t**Could not filter last 5 years of data**')
+                # try:
+                #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
+                # except:
+                #     print('\t**Could not filter last 5 years of data**')
                 df = df.merge(filers, how='left')
                 dfs.append(df)
         else:
             print('\tLoading', filename.split('/')[-1], " "*80, end='\r')
             df = pd.read_csv(zf.open(filename), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
-            try:
-                df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
-            except:
-                print('\t**Could not filter last 5 years of data**')
+            # try:
+            #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
+            # except:
+            #     print('\t**Could not filter last 5 years of data**')
             df = df.merge(filers, how='left')
             dfs.append(df)
     print('\tConcatenating files', " "*80, end='\r')
