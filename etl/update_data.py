@@ -90,10 +90,6 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
     
     # Retrieving filenames and concatenating dfs
     dfs = []
-    try:
-        date_filter = datecols[1]
-    except:
-        date_filter = False
 
     date_parser = lambda date: pd.to_datetime(date, errors='coerce')
 
@@ -104,19 +100,11 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
             for file in files:
                 print('\tLoading', file.split('/')[-1], " "*80, end='\r')
                 df = pd.read_csv(zf.open(file), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
-                # try:
-                #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
-                # except:
-                #     print('\t**Could not filter last 5 years of data**')
                 df = df.merge(filers, on='filerIdent', how='left')
                 dfs.append(df)
         else:
             print('\tLoading', filename.split('/')[-1], " "*80, end='\r')
             df = pd.read_csv(zf.open(filename), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
-            # try:
-            #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
-            # except:
-            #     print('\t**Could not filter last 5 years of data**')
             df = df.merge(filers, on='filerIdent', how='left')
             dfs.append(df)
     print('\tConcatenating files', " "*80, end='\r')
@@ -212,7 +200,7 @@ def main():
     clean_and_export_cover(zf)
 
     # Processing and downloading data
-    clean_and_export_vardata('contribs', zf, filers, [f'contribs_{n}*.csv' for n in range(3, 9)], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
+    clean_and_export_vardata('contribs', zf, filers, ['contribs_*.csv'], contribs_cols, ['receivedDt', 'contributionDt']) # Contributions
     clean_and_export_vardata('expend', zf, filers, ['expend_*.csv'], expend_cols, ['receivedDt', 'expendDt']) # Expenditures
     clean_and_export_vardata('loans', zf, filers, ['loans.csv'], loans_cols, ['receivedDt', 'loanDt']) # Loans
 
