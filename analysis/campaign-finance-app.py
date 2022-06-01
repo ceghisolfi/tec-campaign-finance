@@ -200,6 +200,8 @@ def display_stats(dtype):
 
 def group_data(var, prefix, filtered_data):
     filtered_data.fillna('', inplace=True)
+    filtered_data[f'{var} Dt'] = pd.to_datetime(filtered_data[f'{var} Dt'])
+    filtered_data = filtered_data[filtered_data[f'{var} Dt'].dt.year >= 2017]
 
     for col in filtered_data.columns:
         if list(filtered_data[col].unique()) == ['']:
@@ -232,10 +234,15 @@ def display_data(dtype, filername):
         grouped_count = len(grouped_data)
         grouped_count_str = '{:,}'.format(grouped_count)
 
+        for col in [f'{var} Dt', 'Received Dt']:
+            filtered_data[col] = pd.to_datetime(filtered_data[col])
+            filtered_data = filtered_data[filtered_data[col].isna() == False]
+
         date_min, date_max = filtered_data[f'{var} Dt'].min().strftime(format='%b %d, %Y'), filtered_data[f'{var} Dt'].max().strftime(format='%b %d, %Y')
 
         for col in [f'{var} Dt', 'Received Dt']:
-            filtered_data[col] = pd.to_datetime(filtered_data[col]).apply(lambda x: x.strftime(format='%Y-%m-%d'))
+            filtered_data[col] = filtered_data[col].apply(lambda x: x.strftime(format='%Y-%m-%d'))
+
         for col in [col for col in filtered_data.columns if prefix in col]:
             filtered_data[col] = filtered_data[col].fillna('')
         with st.expander(f'{var}s'):
