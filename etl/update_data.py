@@ -16,12 +16,12 @@ Grouped by individual, sorted by amount and date
 """
 
 # Cols of interest
-contribs_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'contributionDt', 'contributionAmount', 
-            'contributorPersentTypeCd', 'contributorNameOrganization', 
+contribs_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'contributionDt', 'contributionAmount', 'contributionDescr',
+            'contributorPersentTypeCd', 'contributorNameOrganization', 'contributorLawFirmName', 
             'contributorNameLast', 'contributorNameFirst', 'contributorEmployer', 'contributorStreetCity',
             'contributorStreetPostalCode', 'contributorStreetStateCd', 'contributorStreetCountryCd']
 expend_cols = ['recordType', 'reportInfoIdent', 'infoOnlyFlag', 'filerIdent', 'receivedDt', 'expendDt', 'expendAmount', 
-            'expendDescr', 'expendCatCd', 'politicalExpendCd',
+            'expendDescr', 'expendCatCd', 'expendCatDescr', 'politicalExpendCd',
             'payeePersentTypeCd', 'payeeNameOrganization', 'payeeNameLast', 'payeeNameFirst',
             'payeeStreetCity', 'payeeStreetPostalCode', 'payeeStreetStateCd', 'payeeStreetCountryCd']
 # travel_cols = ['recordType', 'reportInfoIdent', 'filerIdent', 'receivedDt', 'parentDt', 'parentType', 'parentId', 
@@ -103,21 +103,21 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
             files = [file for file in zf.namelist() if file.startswith(start) and file.endswith(end)]
             for file in files:
                 print('\tLoading', file.split('/')[-1], " "*80, end='\r')
-                df = pd.read_csv(zf.open(file), dtype=str, parse_dates=datecols, date_parser=date_parser)
+                df = pd.read_csv(zf.open(file), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
                 # try:
                 #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
                 # except:
                 #     print('\t**Could not filter last 5 years of data**')
-                df = df.merge(filers, how='left')
+                df = df.merge(filers, on='filerIdent', how='left')
                 dfs.append(df)
         else:
             print('\tLoading', filename.split('/')[-1], " "*80, end='\r')
-            df = pd.read_csv(zf.open(filename), dtype=str, parse_dates=datecols, date_parser=date_parser)
+            df = pd.read_csv(zf.open(filename), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
             # try:
             #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
             # except:
             #     print('\t**Could not filter last 5 years of data**')
-            df = df.merge(filers, how='left')
+            df = df.merge(filers, on='filerIdent', how='left')
             dfs.append(df)
     print('\tConcatenating files', " "*80, end='\r')
     data = pd.concat(dfs, ignore_index=True)
@@ -205,6 +205,7 @@ def main():
     filers = make_sorted_cols(clean_filer_data(zf.open('filers.csv')))
     filers = filers[(filers['filerName'].str.lower().str.contains('use, do not|not to be use|do not') == False)]
     filers.to_csv(f'{os.getcwd()}/data/processed/filers.csv', index=False)
+    filers.filerEffStartDt = pd.to_datetime(filers.filerEffStartDt)
     filers = filers.sort_values('filerEffStartDt').drop_duplicates(subset=['filerIdent'], keep='last')
 
     # Cleaning and downloading cover data
