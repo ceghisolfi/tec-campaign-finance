@@ -103,7 +103,7 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
             files = [file for file in zf.namelist() if file.startswith(start) and file.endswith(end)]
             for file in files:
                 print('\tLoading', file.split('/')[-1], " "*80, end='\r')
-                df = pd.read_csv(zf.open(file), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
+                df = pd.read_csv(zf.open(file), dtype=str, parse_dates=datecols, date_parser=date_parser)
                 # try:
                 #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
                 # except:
@@ -112,7 +112,7 @@ def clean_and_export_vardata(var, zf, filers, filenames, cols, datecols):
                 dfs.append(df)
         else:
             print('\tLoading', filename.split('/')[-1], " "*80, end='\r')
-            df = pd.read_csv(zf.open(filename), usecols=cols, dtype=str, parse_dates=datecols, date_parser=date_parser)
+            df = pd.read_csv(zf.open(filename), dtype=str, parse_dates=datecols, date_parser=date_parser)
             # try:
             #     df = df[df[date_filter] >= pd.Timestamp.now().normalize() - pd.DateOffset(years=5)]
             # except:
